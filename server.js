@@ -171,7 +171,50 @@ app.post('/api/analisar-agente',async(req,res)=>{
   catch(e){res.status(502).json({erro:e.message});}
 });
 
+function montarPromptExtracao({paginas=[],camposPreliminares={}}={}){
+  const textoPaginas=(Array.isArray(paginas)?paginas:[]).slice(0,30).map((p,i)=>`\n===== PÁGINA ${i+1} =====\n${String(p||'').slice(0,30000)}`).join('\n');
+  return `Extraia fielmente as respostas de um relatório preenchido da atividade P5 - Mediação com Agente de IA (TEDPRO/IFSC).
+
+OBJETIVO
+Corrigir uma extração automática que pode ter misturado enunciados, cabeçalhos, rodapés, colunas de tabela e páginas. Faça análise semântica da estrutura do formulário, mas NÃO resuma, não melhore e não invente respostas.
+
+REGRAS OBRIGATÓRIAS
+- Retorne somente o conteúdo realmente preenchido pelo estudante. Exclua títulos, perguntas, instruções do formulário, cabeçalhos, rodapés e marcadores como "ESCREVA AQUI" ou "COLE AQUI".
+- Preserve integralmente as instruções do item 3.3, inclusive listas, limites, tom e formato. Não misture o enunciado "Copie integralmente..." com a resposta.
+- No item 3.4, separe somente a ferramenta escolhida e a explicação de sua função.
+- O item 3.5 é uma tabela. Reconstrua cada linha semanticamente como: "Nº | Fonte/arquivo | Origem e tipo | Função no agente". Não misture células de linhas diferentes. Se o estudante declarou que não utilizou fontes, preserve essa declaração.
+- No item 3.6, extraia separadamente: configuração de citações + justificativa; link público; outras decisões de configuração.
+- Capturas de tela são imagens. Não invente nem descreva o conteúdo visual com base no texto ao redor. Em evidenciasTeste, registre apenas textos/captions extraídos e diga que as imagens precisam de inspeção visual quando aplicável.
+- Separe rigorosamente: objetivo do teste; resultado esperado; o que funcionou bem; o que precisa melhorar; ajustes realizados ou previstos; contribuição para o desafio; declaração de IA; descrição de ferramentas/finalidade/forma de uso.
+- A declaração de IA refere-se a ferramentas usadas para elaborar o RELATÓRIO além do Gem. Use iaDeclaracao exatamente como "Utilizou IA além do Gem", "Não utilizou IA além do Gem" ou "" quando não for possível identificar marcação.
+- Um campo ausente ou apenas com texto do modelo deve ser "".
+- O link do Gem deve vir do texto; o aplicativo pode complementar depois com hiperlinks anotados no PDF.
+
+CAMPOS PRELIMINARES (podem estar errados; use apenas como pista)
+${JSON.stringify(camposPreliminares)}
+
+TEXTO EXTRAÍDO POR PÁGINA
+${textoPaginas}
+
+Responda APENAS com JSON válido, contendo todas estas chaves:
+{"nome":"","matricula":"","orientador":"","desafio":"","demanda":"","publicoContexto":"","resultadoEsperado":"","nomeGem":"","descricaoGem":"","instrucoesGem":"","ferramentaPadrao":"","fontesConhecimento":"","citacoes":"","linkGem":"","outrasConfiguracoes":"","objetivoTeste":"","resultadoEsperadoTeste":"","evidenciasTeste":"","funcionouBem":"","precisaMelhorar":"","ajustes":"","contribuicao":"","iaDeclaracao":"","iaDescricao":""}`;
+}
+
+function limparExtracaoSemantica(resultado={}){
+  const chaves=['nome','matricula','orientador','desafio','demanda','publicoContexto','resultadoEsperado','nomeGem','descricaoGem','instrucoesGem','ferramentaPadrao','fontesConhecimento','citacoes','linkGem','outrasConfiguracoes','objetivoTeste','resultadoEsperadoTeste','evidenciasTeste','funcionouBem','precisaMelhorar','ajustes','contribuicao','iaDeclaracao','iaDescricao'];
+  const saida={};
+  for(const chave of chaves) saida[chave]=String(resultado?.[chave]||'').trim();
+  if(!['Utilizou IA além do Gem','Não utilizou IA além do Gem'].includes(saida.iaDeclaracao)) saida.iaDeclaracao='';
+  return saida;
+}
+
+app.post('/api/extrair-relatorio',async(req,res)=>{
+  if(precisaChave(res)) return;
+  try{res.json(limparExtracaoSemantica(await chamarOpenAI(montarPromptExtracao(req.body||{}),0)));}
+  catch(e){res.status(502).json({erro:e.message});}
+});
+
 app.use((err,_req,res,_next)=>res.status(500).json({erro:err.message||'Erro interno.'}));
 
 if(require.main===module) app.listen(PORT,()=>console.log(`Avaliador P5 em http://localhost:${PORT}`));
-module.exports={app,montarPrompt,montarPromptAgente,limparAvaliacao,pontoValido};
+module.exports={app,montarPrompt,montarPromptAgente,montarPromptExtracao,limparExtracaoSemantica,limparAvaliacao,pontoValido};

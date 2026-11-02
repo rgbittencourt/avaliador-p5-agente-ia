@@ -1,6 +1,6 @@
 const test=require('node:test');
 const assert=require('node:assert/strict');
-const {montarPrompt,montarPromptAgente,limparAvaliacao,pontoValido}=require('../server');
+const {montarPrompt,montarPromptAgente,montarPromptExtracao,limparExtracaoSemantica,limparAvaliacao,pontoValido}=require('../server');
 
 test('rubrica aceita somente os valores oficiais',()=>{
   assert.equal(pontoValido('configuracao',1.7),2);
@@ -27,4 +27,14 @@ test('análise complementar não atribui nota',()=>{
   const p=montarPromptAgente({instrucoesGem:'Atue como orientador.'});
   assert.match(p,/complementar, não atribui nota/i);
   assert.match(p,/papel, tarefas, público, contexto, limites/i);
+});
+
+test('extração semântica separa tabela, imagens e blocos finais',()=>{
+  const p=montarPromptExtracao({paginas:['3.5 Base de Conhecimento\n1 PPC documento orientar respostas','6. Contribuição\nApoia docentes.']});
+  assert.match(p,/reconstrua cada linha semanticamente/i);
+  assert.match(p,/Capturas de tela são imagens/i);
+  assert.match(p,/Separe rigorosamente/i);
+  const r=limparExtracaoSemantica({fontesConhecimento:'1 | PPC | documento | orientar respostas',iaDeclaracao:'talvez'});
+  assert.equal(r.fontesConhecimento,'1 | PPC | documento | orientar respostas');
+  assert.equal(r.iaDeclaracao,'');
 });
