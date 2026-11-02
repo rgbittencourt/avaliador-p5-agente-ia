@@ -1,6 +1,6 @@
 const test=require('node:test');
 const assert=require('node:assert/strict');
-const {montarPrompt,montarPromptAgente,montarPromptExtracao,limparExtracaoSemantica,limparAvaliacao,avaliarLocalmente,pontoValido}=require('../server');
+const {montarPrompt,montarPromptAgente,montarPromptExtracao,limparExtracaoSemantica,limparAvaliacao,avaliarLocalmente,analisarAgenteLocalmente,pontoValido}=require('../server');
 
 test('rubrica aceita somente os valores oficiais',()=>{
   assert.equal(pontoValido('configuracao',1.7),2);
@@ -46,4 +46,12 @@ test('avaliação local funciona sem OpenAI e é conservadora com capturas',()=>
   assert.equal(r.modo,'local');
   assert.equal(r.pontuacoes.testagem.pontos,1);
   assert.equal(r.pontuacoes.configuracao.pontos,1);
+});
+
+test('análise complementar local gera parecer sem pontuação',()=>{
+  const r=analisarAgenteLocalmente({desafio:'Como podemos apoiar?',demanda:'Orientação',publicoContexto:'Docentes',resultadoEsperado:'Plano',instrucoesGem:'Você é um tutor. Responda em tópicos. Não faça o trabalho pelo usuário.',fontesConhecimento:'1 | Guia | PDF | orientar',citacoesStatus:'Ativadas',objetivoTeste:'Verificar mediação',resultadoEsperadoTeste:'Uma pergunta por vez',precisaMelhorar:'Pode responder tudo',ajustes:'Uma pergunta por vez',contribuicao:'Apoia o planejamento',linkVerificado:'Sim, verificado'});
+  assert.equal(r.modo,'local');
+  assert.match(r.parecer,/não altera a nota/i);
+  assert.ok(r.pontosFortes.length>0);
+  assert.equal('pontuacoes' in r,false);
 });

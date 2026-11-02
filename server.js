@@ -184,10 +184,34 @@ Responda APENAS em JSON:
 }
 
 app.post('/api/analisar-agente',async(req,res)=>{
-  if(precisaChave(res)) return;
+  if(!OPENAI_API_KEY) return res.json(analisarAgenteLocalmente(req.body||{}));
   try{res.json(await chamarOpenAI(montarPromptAgente(req.body||{}),0.25));}
   catch(e){res.status(502).json({erro:e.message});}
 });
+
+function analisarAgenteLocalmente(c={}){
+  const tem=x=>Boolean(String(x||'').trim());
+  const instrucoes=String(c.instrucoesGem||'');
+  const fortes=[],riscos=[],sugestoes=[];
+  if(tem(c.desafio)&&tem(c.demanda)&&tem(c.publicoContexto)&&tem(c.resultadoEsperado)) fortes.push('O encadeamento entre desafio, demanda, público, contexto e resultado esperado está registrado.');
+  else riscos.push('O encadeamento entre desafio, demanda, público/contexto e resultado esperado está incompleto.');
+  if(/papel|persona|você é/i.test(instrucoes)&&/formato|parágrafo|tópico|bullet|lista/i.test(instrucoes)&&/não|evite|limite|restri/i.test(instrucoes)) fortes.push('As instruções apresentam indícios de papel, formato de resposta e limites de atuação.');
+  else sugestoesInstrucao();
+  if(tem(c.fontesConhecimento)) fortes.push('A Base de Conhecimento foi registrada com fontes e funções declaradas.');
+  else riscos.push('Não há Base de Conhecimento registrada nem declaração explícita de que ela não foi utilizada.');
+  if(!tem(c.citacoesStatus)) riscos.push('A configuração de citações não foi identificada.');
+  if(!String(c.linkVerificado||'').startsWith('Sim')) riscos.push('O acesso público ao Gem ainda não foi confirmado pelo professor.');
+  if(tem(c.objetivoTeste)&&tem(c.resultadoEsperadoTeste)) fortes.push('O teste possui objetivo e resultado esperado explicitados.');
+  else sugestões.push('Definir, antes do teste, o comportamento que será verificado e o que caracterizaria uma resposta satisfatória.');
+  if(/não comprova|inspeção visual|confirme manualmente/i.test(c.evidenciasTeste||'')) riscos.push('As capturas ainda precisam de inspeção visual para confirmar a legibilidade da solicitação e da resposta.');
+  if(tem(c.precisaMelhorar)&&tem(c.ajustes)) fortes.push('O relatório relaciona limitações observadas a ajustes realizados ou previstos.');
+  else sugestões.push('Relacionar cada falha encontrada no teste a um ajuste concreto e, depois, repetir o teste.');
+  if(!tem(c.contribuicao)) riscos.push('A contribuição do agente para o desafio e seus limites não foram explicados.');
+  sugestoes.push('Realizar ao menos um novo teste com entrada difícil ou ambígua para verificar limites, manejo de incerteza e preservação da autoria do usuário.');
+  function sugestoesInstrucao(){riscos.push('As instruções não evidenciam claramente todos os elementos de papel, tarefa, formato e limites.');sugestoes.push('Explicitar nas instruções o papel do agente, tarefas, público, contexto, tom, formato das respostas, limites e comportamento diante de incerteza.');}
+  const parecer=`A análise local encontrou ${fortes.length} aspecto(s) estruturados e ${riscos.length} ponto(s) que merecem verificação. Ela examina apenas o conteúdo registrado no formulário e não afirma que o agente executa corretamente o que foi planejado.\n\nA confirmação do funcionamento depende do acesso ao link e da leitura das capturas. Use os itens abaixo como roteiro de revisão pedagógica; esta análise não altera a nota da rubrica.`;
+  return {parecer,pontosFortes:fortes,riscosELacunas:riscos,sugestoesDeRefinamento:sugestoes,modo:'local'};
+}
 
 function montarPromptExtracao({paginas=[],camposPreliminares={}}={}){
   const textoPaginas=(Array.isArray(paginas)?paginas:[]).slice(0,30).map((p,i)=>`\n===== PÁGINA ${i+1} =====\n${String(p||'').slice(0,30000)}`).join('\n');
@@ -236,4 +260,4 @@ app.post('/api/extrair-relatorio',async(req,res)=>{
 app.use((err,_req,res,_next)=>res.status(500).json({erro:err.message||'Erro interno.'}));
 
 if(require.main===module) app.listen(PORT,()=>console.log(`Avaliador P5 em http://localhost:${PORT}`));
-module.exports={app,montarPrompt,montarPromptAgente,montarPromptExtracao,limparExtracaoSemantica,limparAvaliacao,avaliarLocalmente,pontoValido};
+module.exports={app,montarPrompt,montarPromptAgente,montarPromptExtracao,limparExtracaoSemantica,limparAvaliacao,avaliarLocalmente,analisarAgenteLocalmente,pontoValido};
