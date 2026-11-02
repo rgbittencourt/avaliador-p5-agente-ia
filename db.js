@@ -8,11 +8,12 @@ const ARQUIVO = path.join(DIRETORIO_DADOS, 'turmas.json');
 const LEGADO = path.join(DIRETORIO_DADOS, 'turma.json');
 const DATABASE_URL = process.env.DATABASE_URL || '';
 const pool = DATABASE_URL ? new Pool({connectionString:DATABASE_URL, ssl:{rejectUnauthorized:false}}) : null;
+const TABELA_ESTADO = 'p5_app_state';
 let tabelaPronta = false;
 
 async function prepararPostgres(){
   if(!pool || tabelaPronta) return;
-  await pool.query(`CREATE TABLE IF NOT EXISTS app_state (
+  await pool.query(`CREATE TABLE IF NOT EXISTS ${TABELA_ESTADO} (
     id integer PRIMARY KEY,
     payload jsonb NOT NULL,
     updated_at timestamptz NOT NULL DEFAULT now()
@@ -30,7 +31,7 @@ async function salvar(base){
   if(pool){
     await prepararPostgres();
     await pool.query(
-      `INSERT INTO app_state (id, payload, updated_at) VALUES (1, $1::jsonb, now())
+      `INSERT INTO ${TABELA_ESTADO} (id, payload, updated_at) VALUES (1, $1::jsonb, now())
        ON CONFLICT (id) DO UPDATE SET payload = EXCLUDED.payload, updated_at = now()`,
       [JSON.stringify(base)]
     );
@@ -49,7 +50,7 @@ async function salvar(base){
 async function inicializar(){
   if(pool){
     await prepararPostgres();
-    const resultado = await pool.query('SELECT payload FROM app_state WHERE id = 1');
+    const resultado = await pool.query(`SELECT payload FROM ${TABELA_ESTADO} WHERE id = 1`);
     if(resultado.rows[0]?.payload) return resultado.rows[0].payload;
     const agora = new Date().toISOString();
     const base = {version:2, turmas:[]};
