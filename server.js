@@ -84,7 +84,8 @@ Descrição: ${textoCampo(campos.descricaoGem)}
 Instruções integrais: ${textoCampo(campos.instrucoesGem)}
 Ferramenta padrão e função: ${textoCampo(campos.ferramentaPadrao)}
 Fontes/base de conhecimento: ${textoCampo(campos.fontesConhecimento)}
-Citações e justificativa: ${textoCampo(campos.citacoes)}
+Configuração das citações: ${textoCampo(campos.citacoesStatus)}
+Justificativa das citações: ${textoCampo(campos.citacoes)}
 Link público: ${textoCampo(campos.linkGem)}
 Verificação manual do acesso: ${textoCampo(campos.linkVerificado)}
 Outras configurações: ${textoCampo(campos.outrasConfiguracoes)}
@@ -135,10 +136,27 @@ async function chamarOpenAI(prompt,temperatura=0.2){
 }
 
 app.post('/api/avaliar',async(req,res)=>{
-  if(precisaChave(res)) return;
+  if(!OPENAI_API_KEY) return res.json(avaliarLocalmente(req.body||{}));
   try{res.json(limparAvaliacao(await chamarOpenAI(montarPrompt(req.body||{}))));}
   catch(e){res.status(502).json({erro:e.message});}
 });
+
+function avaliarLocalmente(c={}){
+  const preenchido=(...xs)=>xs.every(x=>String(x||'').trim());
+  const confirmado=String(c.linkVerificado||'').startsWith('Sim');
+  const evidenciaConfirmada=preenchido(c.objetivoTeste,c.resultadoEsperadoTeste,c.evidenciasTeste)&&!/não comprova|precisa(?:m)? de inspeção|confirme manualmente/i.test(c.evidenciasTeste);
+  const p={
+    modelo:{pontos:/PDF/i.test(c.conformidadeModelo||'')&&preenchido(c.nome,c.matricula)?1:0,justificativa:'Pontuação baseada no formato e na identificação registrados no formulário.'},
+    demanda:{pontos:preenchido(c.desafio,c.demanda,c.publicoContexto,c.resultadoEsperado)?1:0,justificativa:'Verificação da presença do desafio, demanda, público/contexto e resultado esperado.'},
+    configuracao:{pontos:preenchido(c.nomeGem,c.descricaoGem,c.instrucoesGem,c.ferramentaPadrao,c.fontesConhecimento,c.citacoesStatus,c.citacoes,c.linkGem,c.outrasConfiguracoes)?(confirmado?2:1):preenchido(c.nomeGem,c.instrucoesGem)?1:0,justificativa:confirmado?'Configuração registrada e acesso público confirmado pelo professor.':'Há configuração registrada, mas o acesso público ou algum componente ainda não foi confirmado.'},
+    testagem:{pontos:evidenciaConfirmada?2:preenchido(c.objetivoTeste,c.resultadoEsperadoTeste)?1:0,justificativa:evidenciaConfirmada?'Objetivo, resultado esperado e evidências foram registrados e confirmados.':'Há descrição do teste, mas a legibilidade das capturas ainda exige confirmação visual do professor.'},
+    analise:{pontos:preenchido(c.funcionouBem,c.precisaMelhorar,c.ajustes)?2:preenchido(c.funcionouBem)||preenchido(c.precisaMelhorar)||preenchido(c.ajustes)?1:0,justificativa:'Pontuação baseada na presença de análise de resultados, limitações e ajustes.'},
+    contribuicao:{pontos:preenchido(c.contribuicao)?1:0,justificativa:preenchido(c.contribuicao)?'A contribuição do agente foi explicada.':'A contribuição do agente não foi registrada.'},
+    transparencia:{pontos:preenchido(c.iaDeclaracao)&&(c.iaDeclaracao==='Não utilizou IA além do Gem'||preenchido(c.iaDescricao))?1:0,justificativa:'Verificação da declaração de uso de IA além do próprio Gem.'}
+  };
+  const resultado=limparAvaliacao({pontuacoes:p,alertas:['Avaliação automática local: revise semanticamente as sugestões e confirme visualmente as capturas.'],feedback:'A avaliação automática local verificou o preenchimento e as confirmações registradas. Revise as justificativas da rubrica, valide as capturas de tela e ajuste a pontuação quando necessário.'});
+  return {...resultado,modo:'local'};
+}
 
 function montarPromptAgente(campos={}){
   return `Analise pedagogicamente a concepção de um Gem criado por estudante do TEDPRO/IFSC. Esta análise é complementar, não atribui nota e não substitui a rubrica.
@@ -154,7 +172,7 @@ Descrição: ${textoCampo(campos.descricaoGem)}
 Instruções: ${textoCampo(campos.instrucoesGem)}
 Ferramenta: ${textoCampo(campos.ferramentaPadrao)}
 Fontes: ${textoCampo(campos.fontesConhecimento)}
-Citações: ${textoCampo(campos.citacoes)}
+Citações: ${textoCampo(campos.citacoesStatus)}. Justificativa: ${textoCampo(campos.citacoes)}
 Objetivo e resultado esperado do teste: ${textoCampo(campos.objetivoTeste)} / ${textoCampo(campos.resultadoEsperadoTeste)}
 Evidências: ${textoCampo(campos.evidenciasTeste)}
 Análise do estudante: ${textoCampo(campos.funcionouBem)} / ${textoCampo(campos.precisaMelhorar)}
@@ -183,7 +201,7 @@ REGRAS OBRIGATÓRIAS
 - Preserve integralmente as instruções do item 3.3, inclusive listas, limites, tom e formato. Não misture o enunciado "Copie integralmente..." com a resposta.
 - No item 3.4, separe somente a ferramenta escolhida e a explicação de sua função.
 - O item 3.5 é uma tabela. Reconstrua cada linha semanticamente como: "Nº | Fonte/arquivo | Origem e tipo | Função no agente". Não misture células de linhas diferentes. Se o estudante declarou que não utilizou fontes, preserve essa declaração.
-- No item 3.6, extraia separadamente: configuração de citações + justificativa; link público; outras decisões de configuração.
+- No item 3.6, extraia separadamente citacoesStatus (exatamente "Ativadas", "Desativadas" ou "") e citacoes (somente a justificativa); também separe link público e outras decisões de configuração.
 - Capturas de tela são imagens. Não invente nem descreva o conteúdo visual com base no texto ao redor. Em evidenciasTeste, registre apenas textos/captions extraídos e diga que as imagens precisam de inspeção visual quando aplicável.
 - Separe rigorosamente: objetivo do teste; resultado esperado; o que funcionou bem; o que precisa melhorar; ajustes realizados ou previstos; contribuição para o desafio; declaração de IA; descrição de ferramentas/finalidade/forma de uso.
 - A declaração de IA refere-se a ferramentas usadas para elaborar o RELATÓRIO além do Gem. Use iaDeclaracao exatamente como "Utilizou IA além do Gem", "Não utilizou IA além do Gem" ou "" quando não for possível identificar marcação.
@@ -197,13 +215,14 @@ TEXTO EXTRAÍDO POR PÁGINA
 ${textoPaginas}
 
 Responda APENAS com JSON válido, contendo todas estas chaves:
-{"nome":"","matricula":"","orientador":"","desafio":"","demanda":"","publicoContexto":"","resultadoEsperado":"","nomeGem":"","descricaoGem":"","instrucoesGem":"","ferramentaPadrao":"","fontesConhecimento":"","citacoes":"","linkGem":"","outrasConfiguracoes":"","objetivoTeste":"","resultadoEsperadoTeste":"","evidenciasTeste":"","funcionouBem":"","precisaMelhorar":"","ajustes":"","contribuicao":"","iaDeclaracao":"","iaDescricao":""}`;
+{"nome":"","matricula":"","orientador":"","desafio":"","demanda":"","publicoContexto":"","resultadoEsperado":"","nomeGem":"","descricaoGem":"","instrucoesGem":"","ferramentaPadrao":"","fontesConhecimento":"","citacoesStatus":"","citacoes":"","linkGem":"","outrasConfiguracoes":"","objetivoTeste":"","resultadoEsperadoTeste":"","evidenciasTeste":"","funcionouBem":"","precisaMelhorar":"","ajustes":"","contribuicao":"","iaDeclaracao":"","iaDescricao":""}`;
 }
 
 function limparExtracaoSemantica(resultado={}){
-  const chaves=['nome','matricula','orientador','desafio','demanda','publicoContexto','resultadoEsperado','nomeGem','descricaoGem','instrucoesGem','ferramentaPadrao','fontesConhecimento','citacoes','linkGem','outrasConfiguracoes','objetivoTeste','resultadoEsperadoTeste','evidenciasTeste','funcionouBem','precisaMelhorar','ajustes','contribuicao','iaDeclaracao','iaDescricao'];
+  const chaves=['nome','matricula','orientador','desafio','demanda','publicoContexto','resultadoEsperado','nomeGem','descricaoGem','instrucoesGem','ferramentaPadrao','fontesConhecimento','citacoesStatus','citacoes','linkGem','outrasConfiguracoes','objetivoTeste','resultadoEsperadoTeste','evidenciasTeste','funcionouBem','precisaMelhorar','ajustes','contribuicao','iaDeclaracao','iaDescricao'];
   const saida={};
   for(const chave of chaves) saida[chave]=String(resultado?.[chave]||'').trim();
+  if(!['Ativadas','Desativadas'].includes(saida.citacoesStatus)) saida.citacoesStatus='';
   if(!['Utilizou IA além do Gem','Não utilizou IA além do Gem'].includes(saida.iaDeclaracao)) saida.iaDeclaracao='';
   return saida;
 }
@@ -217,4 +236,4 @@ app.post('/api/extrair-relatorio',async(req,res)=>{
 app.use((err,_req,res,_next)=>res.status(500).json({erro:err.message||'Erro interno.'}));
 
 if(require.main===module) app.listen(PORT,()=>console.log(`Avaliador P5 em http://localhost:${PORT}`));
-module.exports={app,montarPrompt,montarPromptAgente,montarPromptExtracao,limparExtracaoSemantica,limparAvaliacao,pontoValido};
+module.exports={app,montarPrompt,montarPromptAgente,montarPromptExtracao,limparExtracaoSemantica,limparAvaliacao,avaliarLocalmente,pontoValido};

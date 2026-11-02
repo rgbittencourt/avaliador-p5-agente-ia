@@ -1,6 +1,6 @@
 const test=require('node:test');
 const assert=require('node:assert/strict');
-const {montarPrompt,montarPromptAgente,montarPromptExtracao,limparExtracaoSemantica,limparAvaliacao,pontoValido}=require('../server');
+const {montarPrompt,montarPromptAgente,montarPromptExtracao,limparExtracaoSemantica,limparAvaliacao,avaliarLocalmente,pontoValido}=require('../server');
 
 test('rubrica aceita somente os valores oficiais',()=>{
   assert.equal(pontoValido('configuracao',1.7),2);
@@ -34,7 +34,16 @@ test('extração semântica separa tabela, imagens e blocos finais',()=>{
   assert.match(p,/reconstrua cada linha semanticamente/i);
   assert.match(p,/Capturas de tela são imagens/i);
   assert.match(p,/Separe rigorosamente/i);
-  const r=limparExtracaoSemantica({fontesConhecimento:'1 | PPC | documento | orientar respostas',iaDeclaracao:'talvez'});
+  const r=limparExtracaoSemantica({fontesConhecimento:'1 | PPC | documento | orientar respostas',citacoesStatus:'Ativadas',citacoes:'Para assegurar rastreabilidade.',iaDeclaracao:'talvez'});
   assert.equal(r.fontesConhecimento,'1 | PPC | documento | orientar respostas');
+  assert.equal(r.citacoesStatus,'Ativadas');
+  assert.equal(r.citacoes,'Para assegurar rastreabilidade.');
   assert.equal(r.iaDeclaracao,'');
+});
+
+test('avaliação local funciona sem OpenAI e é conservadora com capturas',()=>{
+  const r=avaliarLocalmente({nome:'Aluno',matricula:'1',conformidadeModelo:'PDF identificado',desafio:'Como podemos apoiar?',demanda:'Apoio',publicoContexto:'Docentes',resultadoEsperado:'Orientação',nomeGem:'Tutor',descricaoGem:'Apoia',instrucoesGem:'Oriente',ferramentaPadrao:'Nenhuma',fontesConhecimento:'Não utilizou',citacoesStatus:'Ativadas',citacoes:'Rastreabilidade',linkGem:'https://example.com',outrasConfiguracoes:'Uma pergunta por vez',objetivoTeste:'Testar',resultadoEsperadoTeste:'Perguntar',evidenciasTeste:'As imagens precisam de inspeção visual',funcionouBem:'Mediou',precisaMelhorar:'Pode acelerar',ajustes:'Uma pergunta',contribuicao:'Apoia',iaDeclaracao:'Não utilizou IA além do Gem'});
+  assert.equal(r.modo,'local');
+  assert.equal(r.pontuacoes.testagem.pontos,1);
+  assert.equal(r.pontuacoes.configuracao.pontos,1);
 });
