@@ -61,7 +61,9 @@ function montarPrompt(campos={}){
 REGRAS DE EVIDÊNCIA
 - Diferencie texto extraído do PDF de observação manual do professor.
 - Capturas de tela não podem ser consideradas legíveis apenas porque há imagens no PDF. Use a observação do professor sobre evidências; se estiver ausente ou inconclusiva, seja conservador em testagem.
-- Não afirme que o link público funciona se a verificação não estiver registrada.
+- Interprete "Sim, verificado" como acesso público confirmado.
+- Interprete "Não foi possível acessar publicamente" como falha efetiva de acesso público; nesse caso, o critério de configuração não pode receber a pontuação máxima.
+- Campo de verificação vazio significa apenas que o professor ainda não testou o acesso. Não confunda esse estado com uma falha já constatada.
 - Para configuração, procure nas instruções: papel, tarefas, público, contexto, limites, tom e formato das respostas. Não basta o campo existir.
 - Para fontes, aceite a declaração explícita de que nenhuma fonte foi usada. Quando houver fontes, exija origem/tipo, motivo e função.
 - Para transparência, não confunda o Gem, que é objeto obrigatório da atividade, com outras IAs usadas para redigir o relatório.
@@ -138,17 +140,23 @@ async function chamarOpenAI(prompt,temperatura=0.2){
 app.post('/api/avaliar',async(req,res)=>{
   if(!OPENAI_API_KEY) return res.json(avaliarLocalmente(req.body||{}));
   try{res.json(limparAvaliacao(await chamarOpenAI(montarPrompt(req.body||{}))));}
-  catch(e){res.status(502).json({erro:e.message});}
+  catch(e){
+    const fallback=avaliarLocalmente(req.body||{});
+    fallback.modo='local-fallback';
+    fallback.alertas.unshift(`A avaliação com IA não pôde ser concluída (${e.message}). A rubrica foi preenchida pela análise local conservadora; revise as notas.`);
+    res.json(fallback);
+  }
 });
 
 function avaliarLocalmente(c={}){
   const preenchido=(...xs)=>xs.every(x=>String(x||'').trim());
   const confirmado=String(c.linkVerificado||'').startsWith('Sim');
+  const inacessivel=String(c.linkVerificado||'')==='Não foi possível acessar publicamente';
   const evidenciaConfirmada=preenchido(c.objetivoTeste,c.resultadoEsperadoTeste,c.evidenciasTeste)&&!/não comprova|precisa(?:m)? de inspeção|confirme manualmente/i.test(c.evidenciasTeste);
   const p={
     modelo:{pontos:/PDF/i.test(c.conformidadeModelo||'')&&preenchido(c.nome,c.matricula)?1:0,justificativa:'Pontuação baseada no formato e na identificação registrados no formulário.'},
     demanda:{pontos:preenchido(c.desafio,c.demanda,c.publicoContexto,c.resultadoEsperado)?1:0,justificativa:'Verificação da presença do desafio, demanda, público/contexto e resultado esperado.'},
-    configuracao:{pontos:preenchido(c.nomeGem,c.descricaoGem,c.instrucoesGem,c.ferramentaPadrao,c.fontesConhecimento,c.citacoesStatus,c.citacoes,c.linkGem,c.outrasConfiguracoes)?(confirmado?2:1):preenchido(c.nomeGem,c.instrucoesGem)?1:0,justificativa:confirmado?'Configuração registrada e acesso público confirmado pelo professor.':'Há configuração registrada, mas o acesso público ou algum componente ainda não foi confirmado.'},
+    configuracao:{pontos:preenchido(c.nomeGem,c.descricaoGem,c.instrucoesGem,c.ferramentaPadrao,c.fontesConhecimento,c.citacoesStatus,c.citacoes,c.linkGem,c.outrasConfiguracoes)?(confirmado?2:1):preenchido(c.nomeGem,c.instrucoesGem)?1:0,justificativa:confirmado?'Configuração registrada e acesso público confirmado pelo professor.':inacessivel?'A configuração foi registrada, mas não foi possível acessar o agente publicamente pelo link informado.':'Há configuração registrada, mas o acesso público ainda não foi testado ou algum componente não foi confirmado.'},
     testagem:{pontos:evidenciaConfirmada?2:preenchido(c.objetivoTeste,c.resultadoEsperadoTeste)?1:0,justificativa:evidenciaConfirmada?'Objetivo, resultado esperado e evidências foram registrados e confirmados.':'Há descrição do teste, mas a legibilidade das capturas ainda exige confirmação visual do professor.'},
     analise:{pontos:preenchido(c.funcionouBem,c.precisaMelhorar,c.ajustes)?2:preenchido(c.funcionouBem)||preenchido(c.precisaMelhorar)||preenchido(c.ajustes)?1:0,justificativa:'Pontuação baseada na presença de análise de resultados, limitações e ajustes.'},
     contribuicao:{pontos:preenchido(c.contribuicao)?1:0,justificativa:preenchido(c.contribuicao)?'A contribuição do agente foi explicada.':'A contribuição do agente não foi registrada.'},
@@ -200,12 +208,13 @@ function analisarAgenteLocalmente(c={}){
   if(tem(c.fontesConhecimento)) fortes.push('A Base de Conhecimento foi registrada com fontes e funções declaradas.');
   else riscos.push('Não há Base de Conhecimento registrada nem declaração explícita de que ela não foi utilizada.');
   if(!tem(c.citacoesStatus)) riscos.push('A configuração de citações não foi identificada.');
-  if(!String(c.linkVerificado||'').startsWith('Sim')) riscos.push('O acesso público ao Gem ainda não foi confirmado pelo professor.');
+  if(String(c.linkVerificado||'')==='Não foi possível acessar publicamente') riscos.push('O link informado não permitiu acessar o agente publicamente.');
+  else if(!String(c.linkVerificado||'').startsWith('Sim')) riscos.push('O acesso público ao Gem ainda não foi testado pelo professor.');
   if(tem(c.objetivoTeste)&&tem(c.resultadoEsperadoTeste)) fortes.push('O teste possui objetivo e resultado esperado explicitados.');
-  else sugestões.push('Definir, antes do teste, o comportamento que será verificado e o que caracterizaria uma resposta satisfatória.');
+  else sugestoes.push('Definir, antes do teste, o comportamento que será verificado e o que caracterizaria uma resposta satisfatória.');
   if(/não comprova|inspeção visual|confirme manualmente/i.test(c.evidenciasTeste||'')) riscos.push('As capturas ainda precisam de inspeção visual para confirmar a legibilidade da solicitação e da resposta.');
   if(tem(c.precisaMelhorar)&&tem(c.ajustes)) fortes.push('O relatório relaciona limitações observadas a ajustes realizados ou previstos.');
-  else sugestões.push('Relacionar cada falha encontrada no teste a um ajuste concreto e, depois, repetir o teste.');
+  else sugestoes.push('Relacionar cada falha encontrada no teste a um ajuste concreto e, depois, repetir o teste.');
   if(!tem(c.contribuicao)) riscos.push('A contribuição do agente para o desafio e seus limites não foram explicados.');
   sugestoes.push('Realizar ao menos um novo teste com entrada difícil ou ambígua para verificar limites, manejo de incerteza e preservação da autoria do usuário.');
   function sugestoesInstrucao(){riscos.push('As instruções não evidenciam claramente todos os elementos de papel, tarefa, formato e limites.');sugestoes.push('Explicitar nas instruções o papel do agente, tarefas, público, contexto, tom, formato das respostas, limites e comportamento diante de incerteza.');}

@@ -48,6 +48,17 @@ test('avaliação local funciona sem OpenAI e é conservadora com capturas',()=>
   assert.equal(r.pontuacoes.configuracao.pontos,1);
 });
 
+test('acesso publicamente impossível é uma falha constatada, não um teste pendente',()=>{
+  const dados={nomeGem:'Tutor',descricaoGem:'Apoia',instrucoesGem:'Oriente',ferramentaPadrao:'Nenhuma',fontesConhecimento:'Não utilizou',citacoesStatus:'Ativadas',citacoes:'Rastreabilidade',linkGem:'https://example.com',outrasConfiguracoes:'Uma pergunta por vez',linkVerificado:'Não foi possível acessar publicamente'};
+  const p=montarPrompt(dados);
+  const r=avaliarLocalmente(dados);
+  const a=analisarAgenteLocalmente(dados);
+  assert.match(p,/falha efetiva de acesso público/i);
+  assert.equal(r.pontuacoes.configuracao.pontos,1);
+  assert.match(r.pontuacoes.configuracao.justificativa,/não foi possível acessar/i);
+  assert.ok(a.riscosELacunas.some(x=>/não permitiu acessar/i.test(x)));
+});
+
 test('análise complementar local gera parecer sem pontuação',()=>{
   const r=analisarAgenteLocalmente({desafio:'Como podemos apoiar?',demanda:'Orientação',publicoContexto:'Docentes',resultadoEsperado:'Plano',instrucoesGem:'Você é um tutor. Responda em tópicos. Não faça o trabalho pelo usuário.',fontesConhecimento:'1 | Guia | PDF | orientar',citacoesStatus:'Ativadas',objetivoTeste:'Verificar mediação',resultadoEsperadoTeste:'Uma pergunta por vez',precisaMelhorar:'Pode responder tudo',ajustes:'Uma pergunta por vez',contribuicao:'Apoia o planejamento',linkVerificado:'Sim, verificado'});
   assert.equal(r.modo,'local');
