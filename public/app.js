@@ -144,26 +144,21 @@ async function importClassJson(file){
     const obj=JSON.parse(await file.text());
     const items=Array.isArray(obj)?obj:(Array.isArray(obj.avaliacoes)?obj.avaliacoes:[obj]);
     if(!items.length)throw new Error('O arquivo não contém avaliações.');
-    let cid='';
-    if(obj.turma?.nome){
-      await loadClasses();
-      let turma=classes.find(c=>c.id===obj.turma.id||String(c.nome).trim().toLowerCase()===String(obj.turma.nome).trim().toLowerCase());
-      if(!turma)turma=await api('/api/turmas',{method:'POST',body:JSON.stringify({nome:obj.turma.nome})});
-      cid=turma.id;
-    }else cid=$('classSelect').value;
-    if(!cid)throw new Error('Este JSON não informa a turma. Crie ou selecione uma turma antes de importá-lo.');
-    let imported=0;
-    for(const item of items){
-      if(!item||typeof item!=='object')continue;
-      const id=item.id||`${slug(item.matricula||item.nome)}-${Date.now()}-${imported}`;
-      await api(`/api/turmas/${encodeURIComponent(cid)}/avaliacoes/${encodeURIComponent(id)}`,{method:'PUT',body:JSON.stringify({...item,id})});
-      imported++;
+    const turma=obj.turma?.nome?obj.turma:classes.find(c=>c.id===$('classSelect').value);
+    if(!turma)throw new Error('Este JSON não informa a turma. Crie ou selecione uma turma antes de importá-lo.');
+    const body=JSON.stringify({turma,avaliacoes:items});
+    let resultado;
+    try{resultado=await api('/api/importar-turma',{method:'POST',body});}
+    catch(err){
+      if(!/Failed to fetch|Falha de rede|NetworkError/i.test(err.message))throw err;
+      status.textContent='A conexão oscilou. Tentando novamente...';
+      await new Promise(resolve=>setTimeout(resolve,1800));
+      resultado=await api('/api/importar-turma',{method:'POST',body});
     }
-    await loadClasses(cid);
-    const turma=classes.find(c=>c.id===cid);
-    status.textContent=`Importação concluída: ${imported} avaliação(ões) incorporada(s) à turma ${turma?.nome||cid}.`;
-    $('classStatus').textContent=`Turma ${turma?.nome||cid} carregada com ${evaluations.length} avaliação(ões).`;
-  }catch(err){status.textContent=`Não foi possível importar: ${err.message}`;}
+    await loadClasses(resultado.id);
+    status.textContent=`Importação concluída: ${resultado.inseridas} nova(s), ${resultado.atualizadas} atualizada(s). Turma ${resultado.nome}: ${resultado.quantidade} avaliação(ões).`;
+    $('classStatus').textContent=`Turma ${resultado.nome} carregada com ${resultado.quantidade} avaliação(ões).`;
+  }catch(err){status.textContent=/Failed to fetch/i.test(err.message)?'O servidor não respondeu. Aguarde alguns segundos e tente novamente; o arquivo não foi alterado.':`Não foi possível importar: ${err.message}`;}
   finally{$('importJson').value='';}
 }
 

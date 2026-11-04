@@ -153,6 +153,35 @@ async function upsertAvaliacao(turmaId, id, dados){
   return registro;
 }
 
+async function importarTurma(dados={}){
+  const nome=String(dados.turma?.nome||dados.nome||'').trim();
+  const idInformado=String(dados.turma?.id||dados.turmaId||'').trim();
+  const avaliacoes=Array.isArray(dados.avaliacoes)?dados.avaliacoes:[];
+  if(!nome&&!idInformado) throw new Error('O arquivo não identifica a turma.');
+  if(!avaliacoes.length) throw new Error('O arquivo não contém avaliações.');
+  const base=await ler();
+  let turma=base.turmas.find(t=>(idInformado&&t.id===idInformado)||(nome&&String(t.nome||'').trim().toLowerCase()===nome.toLowerCase()));
+  if(!turma){
+    let id=slug(idInformado||nome),contador=2;
+    while(base.turmas.some(t=>t.id===id))id=`${slug(idInformado||nome)}-${contador++}`;
+    const agora=new Date().toISOString();
+    turma={id,nome:(nome||idInformado).slice(0,120),criadaEm:agora,atualizadaEm:agora,avaliacoes:[]};
+    base.turmas.push(turma);
+  }
+  turma.avaliacoes=Array.isArray(turma.avaliacoes)?turma.avaliacoes:[];
+  let inseridas=0,atualizadas=0;
+  for(let i=0;i<avaliacoes.length;i++){
+    const item=avaliacoes[i];if(!item||typeof item!=='object')continue;
+    const id=String(item.id||`${slug(item.matricula||item.nome)}-${Date.now()}-${i}`);
+    const idx=turma.avaliacoes.findIndex(a=>a.id===id);
+    const registro={...item,id};
+    if(idx>=0){turma.avaliacoes[idx]=registro;atualizadas++;}else{turma.avaliacoes.push(registro);inseridas++;}
+  }
+  turma.atualizadaEm=new Date().toISOString();
+  await salvar(base);
+  return {id:turma.id,nome:turma.nome,inseridas,atualizadas,quantidade:turma.avaliacoes.length};
+}
+
 async function removerAvaliacao(turmaId, id){
   const base = await ler();
   const turma = base.turmas.find(t=>t.id===turmaId);
@@ -195,4 +224,4 @@ function statusBackupGitHub(){
   return githubBackup.status();
 }
 
-module.exports = {listarTurmas, criarTurma, renomearTurma, excluirTurma, listarAvaliacoes, upsertAvaliacao, removerAvaliacao, limparAvaliacoes, sincronizarBackupGitHub, statusBackupGitHub, pareceTurmaP5, mesclarTurmasP5};
+module.exports = {listarTurmas, criarTurma, renomearTurma, excluirTurma, listarAvaliacoes, upsertAvaliacao, importarTurma, removerAvaliacao, limparAvaliacoes, sincronizarBackupGitHub, statusBackupGitHub, pareceTurmaP5, mesclarTurmasP5};

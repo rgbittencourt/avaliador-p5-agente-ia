@@ -44,6 +44,7 @@ app.patch('/api/turmas/:id',async(req,res)=>{try{res.json(await db.renomearTurma
 app.delete('/api/turmas/:id',async(req,res)=>{try{res.json(await db.excluirTurma(req.params.id,req.body?.confirmarNome));}catch(e){res.status(400).json({erro:e.message});}});
 app.get('/api/turmas/:id/avaliacoes',async(req,res)=>{try{res.json(await db.listarAvaliacoes(req.params.id));}catch(e){res.status(404).json({erro:e.message});}});
 app.put('/api/turmas/:id/avaliacoes/:avaliacaoId',async(req,res)=>{try{res.json(await db.upsertAvaliacao(req.params.id,req.params.avaliacaoId,req.body));}catch(e){res.status(500).json({erro:e.message});}});
+app.post('/api/importar-turma',async(req,res)=>{try{res.json(await db.importarTurma(req.body||{}));}catch(e){res.status(400).json({erro:e.message});}});
 app.delete('/api/turmas/:id/avaliacoes/:avaliacaoId',async(req,res)=>{try{await db.removerAvaliacao(req.params.id,req.params.avaliacaoId);res.json({ok:true});}catch(e){res.status(500).json({erro:e.message});}});
 app.delete('/api/turmas/:id/avaliacoes',async(req,res)=>{try{await db.limparAvaliacoes(req.params.id);res.json({ok:true});}catch(e){res.status(500).json({erro:e.message});}});
 app.get('/api/backup/github',(_req,res)=>res.json(db.statusBackupGitHub()));
