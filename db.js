@@ -9,7 +9,30 @@ const LEGADO = path.join(DIRETORIO_DADOS, 'turma.json');
 const DATABASE_URL = process.env.DATABASE_URL || '';
 const pool = DATABASE_URL ? new Pool({connectionString:DATABASE_URL, ssl:{rejectUnauthorized:false}}) : null;
 const TABELA_ESTADO = 'p5_app_state';
+const TABELA_LEGADA = 'app_state';
 let tabelaPronta = false;
+
+function pareceTurmaP5(turma={}){
+  const nome=String(turma.nome||'').trim().toLowerCase();
+  if(['calabresa','portuguesa'].includes(nome)) return true;
+  return (turma.avaliacoes||[]).some(a=>
+    ['nomeGem','linkGem','instrucoesGem','fontesConhecimento','citacoesStatus','agentAnalysis']
+      .some(campo=>String(a?.[campo]||'').trim())
+  );
+}
+
+function mesclarTurmasP5(destino={version:2,turmas:[]},legado={turmas:[]}){
+  const base={...destino,turmas:Array.isArray(destino.turmas)?[...destino.turmas]:[]};
+  for(const antiga of (Array.isArray(legado.turmas)?legado.turmas:[]).filter(pareceTurmaP5)){
+    const atual=base.turmas.find(t=>t.id===antiga.id||String(t.nome||'').trim().toLowerCase()===String(antiga.nome||'').trim().toLowerCase());
+    if(!atual){base.turmas.push(antiga);continue;}
+    atual.avaliacoes=Array.isArray(atual.avaliacoes)?atual.avaliacoes:[];
+    for(const avaliacao of (antiga.avaliacoes||[])){
+      if(!atual.avaliacoes.some(a=>a.id===avaliacao.id)) atual.avaliacoes.push(avaliacao);
+    }
+  }
+  return base;
+}
 
 async function prepararPostgres(){
   if(!pool || tabelaPronta) return;
@@ -51,10 +74,16 @@ async function inicializar(){
   if(pool){
     await prepararPostgres();
     const resultado = await pool.query(`SELECT payload FROM ${TABELA_ESTADO} WHERE id = 1`);
-    if(resultado.rows[0]?.payload) return resultado.rows[0].payload;
-    const agora = new Date().toISOString();
-    const base = {version:2, turmas:[]};
-    await salvar(base);
+    let base=resultado.rows[0]?.payload||{version:2,turmas:[]};
+    try{
+      const existe=await pool.query(`SELECT to_regclass($1) AS tabela`,[`public.${TABELA_LEGADA}`]);
+      if(existe.rows[0]?.tabela){
+        const anterior=await pool.query(`SELECT payload FROM ${TABELA_LEGADA} WHERE id = 1`);
+        const recuperada=mesclarTurmasP5(base,anterior.rows[0]?.payload||{});
+        if(JSON.stringify(recuperada)!==JSON.stringify(base)){base=recuperada;await salvar(base);}
+      }
+    }catch(e){console.error('Migração das turmas P5 antigas não realizada:',e.message);}
+    if(!resultado.rows[0]?.payload) await salvar(base);
     return base;
   }
   try{ return JSON.parse(await fs.readFile(ARQUIVO, 'utf-8')); } catch{}
@@ -166,4 +195,4 @@ function statusBackupGitHub(){
   return githubBackup.status();
 }
 
-module.exports = {listarTurmas, criarTurma, renomearTurma, excluirTurma, listarAvaliacoes, upsertAvaliacao, removerAvaliacao, limparAvaliacoes, sincronizarBackupGitHub, statusBackupGitHub};
+module.exports = {listarTurmas, criarTurma, renomearTurma, excluirTurma, listarAvaliacoes, upsertAvaliacao, removerAvaliacao, limparAvaliacoes, sincronizarBackupGitHub, statusBackupGitHub, pareceTurmaP5, mesclarTurmasP5};
