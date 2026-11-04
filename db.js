@@ -195,18 +195,4 @@ function statusBackupGitHub(){
   return githubBackup.status();
 }
 
-async function diagnosticarArmazenamento(){
-  if(!pool) return {postgres:false,tabelas:[]};
-  const tabelas=await pool.query("SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename");
-  const resultado=[];
-  for(const {tablename} of tabelas.rows){
-    if(!/state|turma|avali/i.test(tablename)) continue;
-    try{
-      const linhas=await pool.query(`SELECT id, payload, updated_at FROM "${tablename.replace(/"/g,'""')}" ORDER BY updated_at DESC NULLS LAST LIMIT 20`);
-      resultado.push({tabela:tablename,linhas:linhas.rows.map(l=>({id:l.id,atualizadoEm:l.updated_at,turmas:Array.isArray(l.payload?.turmas)?l.payload.turmas.map(t=>({id:t.id,nome:t.nome,quantidade:(t.avaliacoes||[]).length})):[]}))});
-    }catch(e){resultado.push({tabela:tablename,erro:e.message});}
-  }
-  return {postgres:true,tabelas:resultado};
-}
-
-module.exports = {listarTurmas, criarTurma, renomearTurma, excluirTurma, listarAvaliacoes, upsertAvaliacao, removerAvaliacao, limparAvaliacoes, sincronizarBackupGitHub, statusBackupGitHub, diagnosticarArmazenamento, pareceTurmaP5, mesclarTurmasP5};
+module.exports = {listarTurmas, criarTurma, renomearTurma, excluirTurma, listarAvaliacoes, upsertAvaliacao, removerAvaliacao, limparAvaliacoes, sincronizarBackupGitHub, statusBackupGitHub, pareceTurmaP5, mesclarTurmasP5};
