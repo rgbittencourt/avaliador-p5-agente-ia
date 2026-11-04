@@ -8,8 +8,8 @@
 <meta name="theme-color" content="#174F5A">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Avaliador P5">
-<link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" href="assets/icon-32.png" type="image/png" sizes="32x32">
+<link rel="icon" href="assets/icon-16.png" type="image/png" sizes="16x16">
 <link rel="apple-touch-icon" href="assets/icon-180.png">
 <link rel="manifest" href="manifest.webmanifest">
 <style>
@@ -21,7 +21,7 @@
 </style>
 </head>
 <body>
-<header><div class="brand"><img src="favicon.svg" alt=""><div><h1>Avaliador · P5 Agente de IA (TEDPRO)</h1><p>Mediação com agente de IA · IFSC Campus Florianópolis-Continente</p></div></div></header>
+<header><div class="brand"><img src="assets/logo-ai-agent.png" alt="Símbolo de um agente de IA educacional avaliado"><div><h1>Avaliador · P5 Agente de IA (TEDPRO)</h1><p>Mediação com agente de IA · IFSC Campus Florianópolis-Continente</p></div></div></header>
 <main class="wrap"><div class="grid"><div>
   <section class="card"><h2>1. Importar relatório do aluno (PDF)</h2><div class="hint">Selecione o PDF preenchido no modelo oficial da P5. O aplicativo preserva páginas, linhas e colunas e, em seguida, interpreta semanticamente os campos para separar a tabela e os blocos do relatório. Somente o texto extraído é enviado à API configurada — nunca o PDF nem as imagens.</div><input type="file" id="pdfFile" accept="application/pdf" style="margin-top:9px"><div id="pdfStatus" class="status"></div><div id="semanticActions" class="semantic-box hidden"><div class="hint">A interpretação acontece automaticamente. Use o botão para repetir a leitura semântica depois de revisar o PDF.</div><div class="toolbar"><button class="btn gold" id="semanticExtract">Reinterpretar campos com IA</button><button class="btn secondary" id="togglePages">Ver páginas e capturas</button></div></div><div id="pageGallery" class="page-gallery hidden"></div></section>
 
