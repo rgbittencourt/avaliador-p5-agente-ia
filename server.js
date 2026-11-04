@@ -45,6 +45,7 @@ app.delete('/api/turmas/:id/avaliacoes/:avaliacaoId',async(req,res)=>{try{await 
 app.delete('/api/turmas/:id/avaliacoes',async(req,res)=>{try{await db.limparAvaliacoes(req.params.id);res.json({ok:true});}catch(e){res.status(500).json({erro:e.message});}});
 app.get('/api/backup/github',(_req,res)=>res.json(db.statusBackupGitHub()));
 app.post('/api/backup/github',async(_req,res)=>{try{res.json(await db.sincronizarBackupGitHub());}catch(e){res.status(503).json({erro:e.message,...db.statusBackupGitHub()});}});
+app.get('/api/diagnostico/armazenamento',async(_req,res)=>{try{res.json(await db.diagnosticarArmazenamento());}catch(e){res.status(500).json({erro:e.message});}});
 
 function textoCampo(valor){
   const s=String(valor||'').trim();
