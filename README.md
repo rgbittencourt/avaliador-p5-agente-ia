@@ -2,6 +2,12 @@
 
 PWA para apoiar a avaliação da atividade **P5 - Mediação com Agente de IA** do TEDPRO/IFSC. A ferramenta segue os sete critérios e os níveis de pontuação da rubrica fornecida.
 
+## Aplicativo publicado
+
+- **App (P5 Agente de IA):** https://avaliador-agente-ia.onrender.com
+- **Verificação do servidor:** https://avaliador-agente-ia.onrender.com/api/health
+- Hospedagem: Render (serviço `avaliador-agente-ia`). O plano gratuito "dorme" sem uso: a primeira abertura pode levar uns 50 segundos.
+
 ## Funcionalidades
 
 - importação do relatório PDF no modelo oficial;
@@ -52,7 +58,6 @@ Abra `http://localhost:3000`.
 ## Privacidade
 
 O PDF é lido no navegador. Somente os campos textuais revisados pelo professor são enviados à API quando uma análise automática é solicitada. O PDF original não é armazenado pelo servidor.
-
 
 ## Seletor de IA
 
