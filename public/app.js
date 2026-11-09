@@ -248,6 +248,6 @@ document.addEventListener('DOMContentLoaded',async()=>{pdfjsLib.GlobalWorkerOpti
 // Bloco de coerência (complementar), logo abaixo da Análise complementar do agente.
 if(window.CoerenciaUI)CoerenciaUI.montar({depoisDe:$('agentAnalysis').closest('section'),tagCard:'section',coletar:()=>formData(),api,
   titulo:'Coerência do agente de IA com o desafio',produto:'do agente de IA',
-  oQue:'Do <b>agente de IA (Gem)</b> criado pelo estudante: instruções, fontes, teste, ajustes e contribuição declarada.',
-  comOQue:'Com o <b>desafio</b>, a <b>demanda</b> escolhida e o <b>público e contexto</b> que ele indicou.',
-  aspectos:['se o agente atende uma necessidade real daquele público dentro do desafio, ou se é um assistente genérico;','se instruções e fontes refletem o público (linguagem, nível, exemplos, limites) e a demanda;','se o teste mostra resultado próximo do esperado para esse público, e se os ajustes aproximam o agente do desafio.','A configuração técnica do agente continua sendo analisada no bloco acima.']});
+  explicacao:'Uma única análise semântica relaciona o <b>agente de IA (Gem)</b> (instruções, fontes, teste, ajustes e contribuição) com o <b>desafio</b>, a <b>demanda</b> e o <b>público e contexto</b> do estudante: o agente atende uma necessidade real desse público no desafio, ou é um assistente genérico? A configuração técnica continua no bloco acima. Ela não altera a rubrica, a nota nem o feedback da avaliação.',
+  dicaAnalise:'Parecer técnico ao professor sobre a coerência do agente com o desafio, a demanda e o público. Totalmente editável.',
+  dicaFeedback:'Mensagem pedagógica ao estudante sobre essa coerência. Totalmente editável.'});
