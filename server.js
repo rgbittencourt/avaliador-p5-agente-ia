@@ -3,7 +3,7 @@ const express = require('express');
 const path = require('path');
 const {RUBRICA, ORDEM} = require('./rubrica');
 const db = require('./db');
-const {configIA, chamarIA, statusIA} = require('./ia');
+const {configIA, configDaRequisicao, chamarIA, statusIA} = require('./ia');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -24,17 +24,19 @@ app.use((req,res,next)=>{
   let usuario='', senha='';
   try{ [usuario,senha] = Buffer.from(header.replace(/^Basic\s+/i,''),'base64').toString('utf8').split(':'); }catch{}
   if(usuario === APP_USERNAME && senha === APP_PASSWORD) return next();
-  res.set('WWW-Authenticate','Basic realm="Avaliador P5 Agente de IA", charset="UTF-8"');
+  res.set('X-Login-Necessario', '1'); // sem WWW-Authenticate: a janela de login é a do app, não a do navegador
   return res.status(401).send('Autenticação necessária.');
 });
 
 app.use(express.json({limit:'4mb'}));
+app.use((req,_res,next)=>{req.ia=configDaRequisicao(req);next();});
+const chamarIAReq=(req,prompt,temperatura)=>chamarIA(prompt,temperatura,{config:req.ia});
 app.use(express.static(path.join(__dirname,'public')));
 app.get('/api/health',(_req,res)=>res.json({ok:true,openaiConfigurada:IA.configurada,...statusIA(IA)}));
 
 function precisaChave(res){
-  if(IA.configurada) return false;
-  res.status(401).json({erro:`${IA.variavelChave} não configurada no servidor.`});
+  if(res.req.ia.configurada) return false;
+  res.status(401).json({erro:`${res.req.ia.variavelChave} não configurada no servidor.`});
   return true;
 }
 
@@ -128,8 +130,8 @@ function limparAvaliacao(resultado={}){
 }
 
 app.post('/api/avaliar',async(req,res)=>{
-  if(!IA.configurada) return res.json(avaliarLocalmente(req.body||{}));
-  try{res.json(limparAvaliacao(await chamarIA(montarPrompt(req.body||{}))));}
+  if(!req.ia.configurada) return res.json(avaliarLocalmente(req.body||{}));
+  try{res.json(limparAvaliacao(await chamarIAReq(req,montarPrompt(req.body||{}))));}
   catch(e){
     const fallback=avaliarLocalmente(req.body||{});
     fallback.modo='local-fallback';
@@ -182,8 +184,8 @@ Responda APENAS em JSON:
 }
 
 app.post('/api/analisar-agente',async(req,res)=>{
-  if(!IA.configurada) return res.json(analisarAgenteLocalmente(req.body||{}));
-  try{res.json(await chamarIA(montarPromptAgente(req.body||{}),0.25));}
+  if(!req.ia.configurada) return res.json(analisarAgenteLocalmente(req.body||{}));
+  try{res.json(await chamarIAReq(req,montarPromptAgente(req.body||{}),0.25));}
   catch(e){res.status(502).json({erro:e.message});}
 });
 
@@ -252,7 +254,7 @@ function limparExtracaoSemantica(resultado={}){
 
 app.post('/api/extrair-relatorio',async(req,res)=>{
   if(precisaChave(res)) return;
-  try{res.json(limparExtracaoSemantica(await chamarIA(montarPromptExtracao(req.body||{}),0)));}
+  try{res.json(limparExtracaoSemantica(await chamarIAReq(req,montarPromptExtracao(req.body||{}),0)));}
   catch(e){res.status(502).json({erro:e.message});}
 });
 

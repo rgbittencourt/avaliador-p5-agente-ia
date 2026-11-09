@@ -16,15 +16,15 @@ const escapeHtml=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;'
 const slug=s=>String(s||'avaliacao').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,80)||`avaliacao-${Date.now()}`;
 
 async function api(url,options={}){
-  const headers={...(options.headers||{})};
+  const headers={...(options.headers||{}),...(window.SeletorIA?SeletorIA.cabecalho():{})};
   if(authHeader) headers.Authorization=authHeader;
   if(options.body && !(options.body instanceof FormData)) headers['Content-Type']='application/json';
   let response=await fetch(url,{...options,headers});
-  if(response.status===401&&response.headers.get('WWW-Authenticate')){
-    const user=prompt('Usuário do aplicativo:','professor'); if(user===null) throw new Error('Autenticação cancelada.');
-    const pass=prompt('Senha do aplicativo:'); if(pass===null) throw new Error('Autenticação cancelada.');
-    authHeader='Basic '+btoa(`${user}:${pass}`); sessionStorage.setItem('p5Auth',authHeader);
-    response=await fetch(url,{...options,headers:{...headers,Authorization:authHeader}});
+  if(response.status===401&&response.headers.get('X-Login-Necessario')){
+    const login=await SeletorIA.pedirLogin('professor'); if(!login) throw new Error('Autenticação cancelada.');
+    authHeader=SeletorIA.basic(login.usuario,login.senha); sessionStorage.setItem('p5Auth',authHeader);
+    response=await fetch(url,{...options,headers:{...headers,...SeletorIA.cabecalho(),Authorization:authHeader}});
+    if(response.status===401){authHeader='';sessionStorage.removeItem('p5Auth');SeletorIA.esquecerLogin();throw new Error('Usuário ou senha incorretos.');}
   }
   const text=await response.text(); let data; try{data=JSON.parse(text);}catch{data={erro:text||`Erro ${response.status}`};}
   if(!response.ok) throw new Error(data.erro||`Erro ${response.status}`);

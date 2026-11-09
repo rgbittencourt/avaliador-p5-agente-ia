@@ -53,3 +53,7 @@ Abra `http://localhost:3000`.
 
 O PDF é lido no navegador. Somente os campos textuais revisados pelo professor são enviados à API quando uma análise automática é solicitada. O PDF original não é armazenado pelo servidor.
 
+
+## Seletor de IA
+
+Com as duas chaves configuradas (`OPENAI_API_KEY` e `ANTHROPIC_API_KEY`), a janela de login do app tem o campo **Inteligência artificial** (OpenAI ou Claude), e o topo da página tem o seletor **IA** para trocar a qualquer momento. A escolha fica salva no navegador. `IA_PROVEDOR` define só a opção inicial. A janela de login agora é do próprio app (o servidor envia `X-Login-Necessario` em vez de `WWW-Authenticate`).
