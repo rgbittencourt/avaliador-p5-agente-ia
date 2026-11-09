@@ -3,11 +3,11 @@ const express = require('express');
 const path = require('path');
 const {RUBRICA, ORDEM} = require('./rubrica');
 const db = require('./db');
+const {configIA, chamarIA, statusIA} = require('./ia');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+const IA = configIA();
 const APP_USERNAME = process.env.APP_USERNAME || 'professor';
 const APP_PASSWORD = process.env.APP_PASSWORD || '';
 
@@ -30,11 +30,11 @@ app.use((req,res,next)=>{
 
 app.use(express.json({limit:'4mb'}));
 app.use(express.static(path.join(__dirname,'public')));
-app.get('/api/health',(_req,res)=>res.json({ok:true,openaiConfigurada:Boolean(OPENAI_API_KEY)}));
+app.get('/api/health',(_req,res)=>res.json({ok:true,openaiConfigurada:IA.configurada,...statusIA(IA)}));
 
 function precisaChave(res){
-  if(OPENAI_API_KEY) return false;
-  res.status(401).json({erro:'OPENAI_API_KEY não configurada no servidor.'});
+  if(IA.configurada) return false;
+  res.status(401).json({erro:`${IA.variavelChave} não configurada no servidor.`});
   return true;
 }
 
@@ -127,23 +127,9 @@ function limparAvaliacao(resultado={}){
   return {pontuacoes,alertas:Array.isArray(resultado.alertas)?resultado.alertas.map(String).filter(Boolean):[],feedback};
 }
 
-async function chamarOpenAI(prompt,temperatura=0.2){
-  const resposta=await fetch('https://api.openai.com/v1/chat/completions',{
-    method:'POST',headers:{Authorization:`Bearer ${OPENAI_API_KEY}`,'Content-Type':'application/json'},
-    body:JSON.stringify({model:OPENAI_MODEL,response_format:{type:'json_object'},temperature:temperatura,messages:[{role:'user',content:prompt}]})
-  });
-  if(!resposta.ok){
-    const detalhe=await resposta.text().catch(()=>'');
-    console.error('OpenAI',resposta.status,detalhe);
-    throw new Error(`A API da OpenAI recusou a análise (${resposta.status}).`);
-  }
-  const data=await resposta.json();
-  return JSON.parse(data.choices?.[0]?.message?.content||'{}');
-}
-
 app.post('/api/avaliar',async(req,res)=>{
-  if(!OPENAI_API_KEY) return res.json(avaliarLocalmente(req.body||{}));
-  try{res.json(limparAvaliacao(await chamarOpenAI(montarPrompt(req.body||{}))));}
+  if(!IA.configurada) return res.json(avaliarLocalmente(req.body||{}));
+  try{res.json(limparAvaliacao(await chamarIA(montarPrompt(req.body||{}))));}
   catch(e){
     const fallback=avaliarLocalmente(req.body||{});
     fallback.modo='local-fallback';
@@ -196,8 +182,8 @@ Responda APENAS em JSON:
 }
 
 app.post('/api/analisar-agente',async(req,res)=>{
-  if(!OPENAI_API_KEY) return res.json(analisarAgenteLocalmente(req.body||{}));
-  try{res.json(await chamarOpenAI(montarPromptAgente(req.body||{}),0.25));}
+  if(!IA.configurada) return res.json(analisarAgenteLocalmente(req.body||{}));
+  try{res.json(await chamarIA(montarPromptAgente(req.body||{}),0.25));}
   catch(e){res.status(502).json({erro:e.message});}
 });
 
@@ -266,7 +252,7 @@ function limparExtracaoSemantica(resultado={}){
 
 app.post('/api/extrair-relatorio',async(req,res)=>{
   if(precisaChave(res)) return;
-  try{res.json(limparExtracaoSemantica(await chamarOpenAI(montarPromptExtracao(req.body||{}),0)));}
+  try{res.json(limparExtracaoSemantica(await chamarIA(montarPromptExtracao(req.body||{}),0)));}
   catch(e){res.status(502).json({erro:e.message});}
 });
 

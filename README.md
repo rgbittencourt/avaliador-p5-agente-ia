@@ -31,8 +31,10 @@ Abra `http://localhost:3000`.
 
 ## Variáveis de ambiente
 
-- `OPENAI_API_KEY`: chave para avaliação automática e análise complementar;
-- `OPENAI_MODEL`: padrão `gpt-4o-mini`;
+- `IA_PROVEDOR`: `openai` ou `anthropic` (vazio: OpenAI se houver chave, senão Anthropic);
+- `OPENAI_API_KEY` / `OPENAI_MODEL` (padrão `gpt-4o-mini`): OpenAI;
+- `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL` (padrão `claude-haiku-5-5`): Anthropic (Claude);
+- a IA é usada na avaliação automática, na análise complementar do agente e na extração do relatório; toda a chamada fica em `ia.js`;
 - `APP_USERNAME` e `APP_PASSWORD`: proteção das APIs;
 - `DATABASE_URL`: PostgreSQL/Neon; sem ela, usa `data/turmas.json`;
 - `GITHUB_DATA_*`: repositório privado de backup das turmas.
