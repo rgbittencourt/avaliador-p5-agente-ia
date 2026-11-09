@@ -4,6 +4,7 @@ const path = require('path');
 const {RUBRICA, ORDEM} = require('./rubrica');
 const db = require('./db');
 const {configIA, configDaRequisicao, chamarIA, statusIA} = require('./ia');
+const { montarPromptCoerencia, limparSaidaCoerencia } = require('./coerencia');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -258,7 +259,38 @@ app.post('/api/extrair-relatorio',async(req,res)=>{
   catch(e){res.status(502).json({erro:e.message});}
 });
 
+// ---------- Coerência (complementar, sem pontuação) ----------
+const ASSINATURA_COERENCIA = () => 'Prof. Rogério';
+function atividadeCoerencia(c = {}) {
+  return {
+    nome: 'P5 - Mediação com Agente de IA (Gem)',
+    produto: 'agente de IA (Gem) configurado pelo estudante, com instruções, fontes, teste e refinamento',
+    cadeia: 'desafio -> demanda -> público e contexto -> resultado esperado -> configuração do agente (instruções e fontes) -> teste -> refinamento -> contribuição do agente para o desafio',
+    criterios: [
+      'Pergunte se o agente, como foi configurado, atende uma necessidade real daquele público dentro do desafio, ou se é um assistente genérico que serviria a qualquer pessoa.',
+      'Verifique se as instruções e as fontes refletem o público (linguagem, nível, exemplos, limites) e a demanda declarada.',
+      'Use o teste registrado como evidência de utilidade: o resultado obtido se aproxima do resultado esperado para aquele público? O refinamento aproxima o agente do desafio?',
+      'Não repita a análise técnica da configuração do agente (ela existe em outro campo); concentre-se na utilidade para o desafio e para o público.'
+    ],
+    evidencia: 'Diferencie configuração declarada, evidência do teste e intenção futura. Não invente o funcionamento do agente.',
+    campos: [
+      ['Nome', c.nome], ['Desafio', c.desafio], ['Demanda escolhida', c.demanda], ['Público e contexto', c.publicoContexto],
+      ['Resultado esperado', c.resultadoEsperado], ['Nome do agente', c.nomeGem], ['Descrição do agente', c.descricaoGem],
+      ['Instruções do agente', c.instrucoesGem], ['Fontes de conhecimento', c.fontesConhecimento],
+      ['Objetivo do teste', c.objetivoTeste], ['Resultado esperado do teste', c.resultadoEsperadoTeste], ['Evidências do teste', c.evidenciasTeste],
+      ['O que funcionou bem', c.funcionouBem], ['O que precisa melhorar', c.precisaMelhorar], ['Ajustes realizados', c.ajustes],
+      ['Contribuição declarada para o desafio', c.contribuicao]
+    ]
+  };
+}
+app.post('/api/analisar-coerencia', async (req, res) => {
+  if (!req.ia.configurada) return res.status(401).json({ erro: `${req.ia.variavelChave} não configurada no servidor. A análise de coerência precisa de IA.` });
+  const campos = req.body || {};
+  try { res.json(limparSaidaCoerencia(await chamarIAReq(req, montarPromptCoerencia(atividadeCoerencia(campos)), 0.25), ASSINATURA_COERENCIA(campos))); }
+  catch (e) { res.status(e.status || 502).json({ erro: e.message }); }
+});
+
 app.use((err,_req,res,_next)=>res.status(500).json({erro:err.message||'Erro interno.'}));
 
 if(require.main===module) app.listen(PORT,()=>console.log(`Avaliador P5 em http://localhost:${PORT}`));
-module.exports={app,montarPrompt,montarPromptAgente,montarPromptExtracao,limparExtracaoSemantica,limparAvaliacao,avaliarLocalmente,analisarAgenteLocalmente,pontoValido};
+module.exports={atividadeCoerencia,app,montarPrompt,montarPromptAgente,montarPromptExtracao,limparExtracaoSemantica,limparAvaliacao,avaliarLocalmente,analisarAgenteLocalmente,pontoValido};

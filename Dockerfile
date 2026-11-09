@@ -2,7 +2,7 @@ FROM node:20-alpine
 WORKDIR /app
 COPY package.json ./
 RUN npm install --omit=dev
-COPY server.js db.js github-backup.js rubrica.js ia.js ./
+COPY server.js db.js github-backup.js rubrica.js ia.js coerencia.js ./
 COPY public ./public
 RUN mkdir -p /app/data
 ENV NODE_ENV=production
